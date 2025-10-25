@@ -17,9 +17,13 @@ type APIClient struct {
 	httpClient *http.Client
 }
 
-func NewClient() *APIClient {
+func NewClient(baseURL ...string) *APIClient {
+	url := "https://hacker-news.firebaseio.com/v0"
+	if len(baseURL) > 0 {
+		url = baseURL[0]
+	}
 	return &APIClient{
-		baseURL: "https://hacker-news.firebaseio.com/v0",
+		baseURL: url,
 		httpClient: &http.Client{
 			Timeout: 10 * time.Second,
 		},

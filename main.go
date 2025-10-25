@@ -15,7 +15,10 @@ func main() {
 		log.Fatal(err)
 	}
 
-	for _, item := range items {
-		fmt.Printf("ID: %d\nTitle: %s\nURL: %s\n", item.ID, item.Title, item.URL)
+	for i, item := range items {
+		if i >= 10 {
+			break
+		}
+		fmt.Printf("Title: %s\nURL: %s\n", item.Title, item.URL)
 	}
 }
