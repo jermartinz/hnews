@@ -1,24 +1,22 @@
 package main
 
 import (
-	"fmt"
 	"log"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/jermartinz/hn/api"
+	"github.com/jermartinz/hn/tui"
 )
 
 func main() {
 	client := api.NewClient()
-
-	items, err := client.GetItemStories()
-	if err != nil {
-		log.Fatal(err)
+	m := tui.Model{
+		Client:       client,
+		ItemsPerPage: 10,
+		Loading:      true,
 	}
-
-	for i, item := range items {
-		if i >= 10 {
-			break
-		}
-		fmt.Printf("Title: %s\nURL: %s\n", item.Title, item.URL)
+	p := tea.NewProgram(m)
+	if _, err := p.Run(); err != nil {
+		log.Fatal(err)
 	}
 }
