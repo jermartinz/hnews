@@ -2,30 +2,57 @@ package tui
 
 import (
 	"fmt"
+	"os"
+	"os/exec"
+	"runtime"
+	"strings"
 
 	"github.com/jermartinz/hn/api"
 	"github.com/jermartinz/hn/models"
 
+	"github.com/charmbracelet/bubbles/list"
+	"github.com/charmbracelet/bubbles/paginator"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/pkg/browser"
 )
 
 var (
-	titleStyle = lipgloss.NewStyle().MarginLeft(2)
-	itemStyle  = lipgloss.NewStyle().PaddingLeft(4)
+	orangeColor = lipgloss.Color("#ff6600")
+	appStyle    = lipgloss.NewStyle().Padding(1, 2)
+	titleSyte   = lipgloss.NewStyle().
+			Foreground(lipgloss.AdaptiveColor{Light: "#16", Dark: "255"}).
+			Background(orangeColor).
+			Padding(0, 1)
 )
 
+func ModelStyle() Model {
+	items := []list.Item{}
+	d := list.NewDefaultDelegate()
+	d.Styles.SelectedTitle = d.Styles.SelectedTitle.Foreground(orangeColor).BorderLeftForeground(orangeColor)
+	d.Styles.SelectedDesc = d.Styles.SelectedDesc.Foreground(orangeColor).BorderLeftForeground(orangeColor)
+	l := list.New(items, d, 80, 20)
+	l.SetShowPagination(true)
+
+	l.Paginator.PerPage = 10
+	l.Title = "Hacker News"
+	l.Styles.Title = titleSyte
+	l.Paginator.Type = paginator.Dots
+	l.Paginator.ActiveDot = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "235", Dark: "252"}).Render("•")
+	l.Paginator.InactiveDot = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "250", Dark: "238"}).Render("•")
+
+	return Model{
+		List:    l,
+		Loading: true,
+		Client:  api.NewClient(),
+	}
+}
+
 type Model struct {
-	Items        []*models.Item
-	Loading      bool
-	Err          error
-	Client       *api.APIClient
-	Cursor       int
-	Page         int
-	ItemsPerPage int
-	Choice       string
-	Quitting     bool
+	Items   []*models.Item
+	List    list.Model
+	Loading bool
+	Err     error
+	Client  *api.APIClient
 }
 
 type storiesLoadedMsg struct {
@@ -46,61 +73,67 @@ func (m Model) Init() tea.Cmd {
 	}
 }
 
+func isWSL() bool {
+	data, err := os.ReadFile("/proc/version")
+	if err != nil {
+		return false
+	}
+	return strings.Contains(strings.ToLower(string(data)), "microsoft")
+}
+
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var cmd tea.Cmd
 	switch msg := msg.(type) {
 	case storiesLoadedMsg:
 		m.Items = msg.items
+		items := make([]list.Item, len(msg.items))
+
+		for i, item := range msg.items {
+			items[i] = item
+		}
+		m.List.SetItems(items)
 		m.Loading = false
 		return m, nil
 	case errMsg:
 		m.Err = msg.err
 		m.Loading = false
 		return m, nil
+	case tea.WindowSizeMsg:
+		m.List.SetSize(msg.Width, msg.Height)
 	case tea.KeyMsg:
-		switch keypress := msg.String(); keypress {
+		switch msg.String() {
 		case "q", "ctrl+c":
-			m.Quitting = true
 			return m, tea.Quit
 		case "enter":
-			index := m.Page*m.ItemsPerPage + m.Cursor
-			if index >= len(m.Items) {
-				return m, nil
+			selectedItem := m.List.SelectedItem()
+			if item, ok := selectedItem.(*models.Item); ok {
+				go func() {
+					var cmd *exec.Cmd
+					switch runtime.GOOS {
+					case "linux":
+						if isWSL() {
+							cmd = exec.Command("wsl-open", item.URL)
+						} else {
+							cmd = exec.Command("xdg-open", item.URL)
+						}
+					case "darwin":
+						cmd = exec.Command("open", item.URL)
+					case "windows":
+						cmd = exec.Command("cmd", "/c", "start", item.URL)
+					}
+					if cmd != nil {
+						cmd.Stdout = nil
+						cmd.Stderr = nil
+						cmd.Start()
+					}
+				}()
 			}
-			browser.OpenURL(m.Items[index].URL)
 			return m, nil
-		case "down":
-			m.Cursor++
-			index := m.Page*m.ItemsPerPage + m.Cursor
-			if index >= len(m.Items) {
-				m.Cursor--
-				return m, nil
-			}
-			if m.Cursor >= m.ItemsPerPage {
-				m.Page++
-				m.Cursor = 0
-			}
-		case "up":
-			if m.Cursor > 0 {
-				m.Cursor--
-			} else if m.Page > 0 {
-				m.Page--
-				m.Cursor = m.ItemsPerPage - 1
-			}
-		case "right":
-			totalPages := len(m.Items) / m.ItemsPerPage
-			if len(m.Items)%m.ItemsPerPage > 0 {
-				totalPages++
-			}
-			if m.Page < totalPages-1 {
-				m.Page++
-			}
-		case "left":
-			if m.Page > 0 {
-				m.Page--
-			}
+
 		}
 	}
-	return m, nil
+	m.List, cmd = m.List.Update(msg)
+	return m, cmd
 }
 
 func (m Model) View() string {
@@ -113,21 +146,5 @@ func (m Model) View() string {
 	if len(m.Items) == 0 {
 		return "Oops, there are no stories at this time."
 	}
-	start := m.Page * m.ItemsPerPage
-	end := start + m.ItemsPerPage
-
-	end = min(end, len(m.Items))
-	var s string
-	for i := start; i < end; i++ {
-		cursor := " "
-		if i-start == m.Cursor {
-			cursor = ">"
-		}
-		s += fmt.Sprintf("%s %d. %s\n", cursor, i+1, m.Items[i].Title)
-	}
-
-	totalPages := (len(m.Items) + m.ItemsPerPage - 1) / m.ItemsPerPage
-	s += fmt.Sprintf("\nPage %d/%d | Use arrows to navigate, Enter to open, q to quit", m.Page+1, totalPages)
-
-	return s
+	return appStyle.Render(m.List.View())
 }
