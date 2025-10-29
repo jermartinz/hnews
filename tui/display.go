@@ -90,9 +90,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			totalPages := len(m.Items) / m.ItemsPerPage
 			if len(m.Items)%m.ItemsPerPage > 0 {
 				totalPages++
-				if m.Page < totalPages-1 {
-					m.Page++
-				}
+			}
+			if m.Page < totalPages-1 {
+				m.Page++
 			}
 		case "left":
 			if m.Page > 0 {
@@ -116,9 +116,7 @@ func (m Model) View() string {
 	start := m.Page * m.ItemsPerPage
 	end := start + m.ItemsPerPage
 
-	if end > len(m.Items) {
-		end = len(m.Items)
-	}
+	end = min(end, len(m.Items))
 	var s string
 	for i := start; i < end; i++ {
 		cursor := " "
@@ -127,5 +125,9 @@ func (m Model) View() string {
 		}
 		s += fmt.Sprintf("%s %d. %s\n", cursor, i+1, m.Items[i].Title)
 	}
+
+	totalPages := (len(m.Items) + m.ItemsPerPage - 1) / m.ItemsPerPage
+	s += fmt.Sprintf("\nPage %d/%d | Use arrows to navigate, Enter to open, q to quit", m.Page+1, totalPages)
+
 	return s
 }
