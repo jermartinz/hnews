@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/jermartinz/hn/models"
+	"github.com/jermartinz/hnews/models"
 )
 
 type APIClient struct {

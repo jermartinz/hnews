@@ -7,8 +7,8 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/jermartinz/hn/api"
-	"github.com/jermartinz/hn/models"
+	"github.com/jermartinz/hnews/api"
+	"github.com/jermartinz/hnews/models"
 
 	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/bubbles/paginator"
@@ -78,6 +78,10 @@ func isWSL() bool {
 	if err != nil {
 		return false
 	}
+	return checkWsl(data)
+}
+
+func checkWsl(data []byte) bool {
 	return strings.Contains(strings.ToLower(string(data)), "microsoft")
 }
 
