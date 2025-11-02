@@ -19,7 +19,7 @@ import (
 var (
 	orangeColor = lipgloss.Color("#ff6600")
 	appStyle    = lipgloss.NewStyle().Padding(1, 2)
-	titleSyte   = lipgloss.NewStyle().
+	titleStyle  = lipgloss.NewStyle().
 			Foreground(lipgloss.AdaptiveColor{Light: "#16", Dark: "255"}).
 			Background(orangeColor).
 			Padding(0, 1)
@@ -31,11 +31,12 @@ func ModelStyle() Model {
 	d.Styles.SelectedTitle = d.Styles.SelectedTitle.Foreground(orangeColor).BorderLeftForeground(orangeColor)
 	d.Styles.SelectedDesc = d.Styles.SelectedDesc.Foreground(orangeColor).BorderLeftForeground(orangeColor)
 	l := list.New(items, d, 80, 20)
+	l.SetShowTitle(true)
 	l.SetShowPagination(true)
 
 	l.Paginator.PerPage = 10
 	l.Title = "Hacker News"
-	l.Styles.Title = titleSyte
+	l.Styles.Title = titleStyle
 	l.Paginator.Type = paginator.Dots
 	l.Paginator.ActiveDot = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "235", Dark: "252"}).Render("•")
 	l.Paginator.InactiveDot = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "250", Dark: "238"}).Render("•")
@@ -103,7 +104,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.Loading = false
 		return m, nil
 	case tea.WindowSizeMsg:
-		m.List.SetSize(msg.Width, msg.Height)
+		h, v := appStyle.GetFrameSize()
+		m.List.SetSize(msg.Width-h, msg.Height-v)
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "q", "ctrl+c":
